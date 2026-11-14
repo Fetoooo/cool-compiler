@@ -28,7 +28,7 @@ Assignment 1 - Compiler/
 
 ---
 
-## 🛠️ PA1: Lexical Analysis (`cool.flex`)
+## PA1: Lexical Analysis (`cool.flex`)
 
 ### Files:
 - **`cool.flex`**: Defines regular expressions and actions for all COOL tokens:
@@ -66,7 +66,7 @@ make lexer
 
 ---
 
-## 🌳 PA2: Syntax Analysis & AST Construction (`cool.y`)
+## PA2: Syntax Analysis & AST Construction (`cool.y`)
 
 ### Files:
 - **`cool.y`**: GNU Bison grammar specification implementing:
