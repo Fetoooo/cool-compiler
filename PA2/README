@@ -1,0 +1,94 @@
+README file for Programming Assignment II (Parser - cool.y)
+===========================================================
+
+1. Overview
+-----------
+This assignment implements a parser for the COOL (Classroom Object-Oriented
+Language) using GNU Bison. The parser receives a stream of tokens produced by the
+Cool lexical analyzer, constructs an Abstract Syntax Tree (AST) rooted at a
+`Program` node using semantic actions and constructor functions provided by the
+Cool tree package (`cool-tree.h`), and performs robust error recovery.
+
+2. Design & Implementation Details
+----------------------------------
+
+a. Grammar Structure & AST Construction:
+   - Program & Classes:
+     The root of the AST is constructed by `program(class_list)`.
+     Classes default to inheriting from `Object` when no explicit `inherits`
+     clause is provided. Class nodes are created via:
+     `class_(name, parent, features, filename)`
+   - Features:
+     Methods are defined by `method(name, formals, return_type, expr)` and
+     attributes by `attr(name, type_decl, init_expr)`. Attributes without an
+     explicit initialization expression default to `no_expr()`.
+   - Lists:
+     All AST lists (`Classes`, `Features`, `Formals`, `Expressions`, `Cases`)
+     are constructed using `nil_<Type>()`, `single_<Type>()`, and
+     `append_<Type>()` functions.
+   - Expressions:
+     Every expression form defined in Figure 1 of the Cool Reference Manual is
+     supported:
+     * Assignment: `assign(id, expr)`
+     * Dynamic dispatch: `dispatch(expr, method_id, actuals)`
+     * Static dispatch: `static_dispatch(expr, type_id, method_id, actuals)`
+     * Self dispatch shorthand `f(...)`: syntactic sugar for `self.f(...)`
+     * Conditionals: `cond(pred, then_exp, else_exp)`
+     * While loops: `loop(pred, body)`
+     * Block expressions: `block(expressions)`
+     * Let bindings: nested `let(id, type, init, body)` nodes
+     * Case expressions: `typcase(expr, cases)` with branch nodes `branch(...)`
+     * Constructors & Tests: `new_(type)`, `isvoid(expr)`
+     * Arithmetic & Logic: `plus`, `sub`, `mul`, `divide`, `neg` (~),
+       `lt` (<), `leq` (<=), `eq` (=), `comp` (not)
+     * Constants & Objects: `object`, `int_const`, `string_const`, `bool_const`
+
+b. Operator Precedence & Resolving the "Let-In" Ambiguity:
+   - Operators are assigned precedence levels from lowest to highest:
+     * `LETPREC` (dummy token with lowest precedence)
+     * `ASSIGN` (right-associative)
+     * `NOT` (non-associative)
+     * `LE`, `<`, `=` (non-associative)
+     * `+`, `-` (left-associative)
+     * `*`, `/` (left-associative)
+     * `ISVOID` (non-associative)
+     * `~` (non-associative)
+     * `@` (non-associative)
+     * `.` (non-associative)
+   - The Cool `let` construct extends as far to the right as possible. To resolve
+     shift/reduce conflicts, `let_expr` productions ending with `IN expr` are
+     associated with the low-precedence pseudo-token `%prec LETPREC`. As a result,
+     subsequent operators shift onto the inner expression rather than prematurely
+     reducing the outer let expression.
+
+c. Error Handling & Recovery:
+   Using Bison's `error` token and synchronization tokens, the parser recovers in
+   all 4 required scenarios:
+   1. Class definitions:
+      `class_list error ';'` catches errors in class definitions up to the class
+      terminating `;`, allowing parsing to restart cleanly at the next class.
+   2. Features within a class:
+      `feature_list error ';'` synchronizes on `;`, discarding the malformed
+      feature and continuing to the next feature.
+   3. Let variable bindings:
+      `error ',' let_expr` synchronizes on `,`, discarding the faulty variable
+      declaration and continuing with the remaining bindings in the let list.
+   4. Expressions in a `{ ... }` block:
+      `expr_block error ';'` synchronizes on `;`, discarding the faulty expression
+      and continuing with subsequent expressions in the block.
+
+3. Testing Strategy (`good.cl` & `bad.cl`)
+-----------------------------------------
+- `good.cl`:
+  Exercises every single legal construct in Cool: classes with and without
+  inheritance, methods with various parameter counts, attributes with and without
+  initialization, self/object/static dispatch, nested loops and conditionals,
+  chained let bindings, case expressions, all arithmetic, boolean, and comparison
+  operators.
+- `bad.cl`:
+  Specifically exercises the 4 error recovery requirements:
+  1. Errors in class definitions followed by valid classes.
+  2. Errors in attributes and methods followed by valid features.
+  3. Errors in individual let bindings recovering at commas.
+  4. Errors in expressions within a `{ ... }` block recovering at semicolons.
+

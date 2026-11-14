@@ -1,0 +1,20 @@
+# Binaries and compiled object files
+*.o
+*.exe
+*.out
+lexer
+parser
+*.output
+
+# Generated C/C++ lexer/parser files
+cool-lex.cc
+cool-parse.cc
+cool-parse.h.output
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*~

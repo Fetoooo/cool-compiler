@@ -1,0 +1,73 @@
+README file for Programming Assignment I (Lexical Analysis - cool.flex)
+========================================================================
+
+1. Overview
+-----------
+This assignment implements a lexical analyzer (scanner) for the COOL (Classroom
+Object-Oriented Language) using GNU Flex. The scanner reads COOL source files,
+tokenizes the input according to the Cool Reference Manual lexical specification,
+builds entries in the string, integer, and identifier tables, and communicates
+tokens and errors to the parser via `cool_yylex()`.
+
+2. Design & Implementation Details
+----------------------------------
+
+a. Keywords & Identifiers:
+   - All Cool keywords (except `true` and `false`) are case-insensitive. They
+     are matched using full case-insensitive regex patterns (e.g. `[cC][lL][aA][sS][sS]`).
+   - `true` and `false` must begin with a lowercase letter ('t' or 'f'), with
+     remaining characters being case-insensitive (e.g. `t[rR][uU][eE]`). They set
+     `cool_yylval.boolean` to 1 or 0 respectively and return `BOOL_CONST`.
+   - Identifiers beginning with a capital letter `[A-Z][a-zA-Z0-9_]*` return
+     `TYPEID` and are stored in `idtable`.
+   - Identifiers beginning with a lowercase letter `[a-z][a-zA-Z0-9_]*` return
+     `OBJECTID` and are stored in `idtable`.
+   - Integer constants `[0-9]+` return `INT_CONST` and are stored in `inttable`.
+
+b. Comments:
+   - Single-line comments starting with `--` are ignored up to the end of the line
+     without consuming the newline character, ensuring accurate `curr_lineno`
+     tracking.
+   - Multi-line comments enclosed in `(* ... *)` support arbitrary levels of nesting.
+     A global counter `comment_depth` tracks nesting depth within the `%x COMMENT`
+     start condition:
+       - `(*` increments `comment_depth`.
+       - `*)` decrements `comment_depth` and exits back to `INITIAL` when depth hits 0.
+       - Reaching EOF inside a comment emits the error "EOF in comment".
+       - Unmatched `*)` outside a comment in `INITIAL` emits the error "Unmatched *)".
+
+c. String Constants:
+   - Handled via exclusive start conditions `%x STRING` and `%x STRING_ERROR`.
+   - String constants accumulate into `string_buf` with maximum length 1024 characters
+     (leaving 1 character for null terminator `\0` within `MAX_STR_CONST = 1025`).
+   - If the string exceeds 1024 characters, the error "String constant too long" is
+     reported and the scanner enters `STRING_ERROR`.
+   - If an unescaped newline is found within a string, `curr_lineno` is incremented,
+     the error "Unterminated string constant" is reported, and the scanner returns to
+     `INITIAL`.
+   - If a literal null character (`\0`) is encountered, the error "String contains
+     null character" is reported and the scanner enters `STRING_ERROR`.
+   - In accordance with the Cool specification, the escape sequence `\0` (the two
+     characters '\' and '0') is explicitly converted to the character '0' (ASCII 48).
+   - Standard escape sequences `\b`, `\t`, `\n`, `\f`, and `\c` (for any character c)
+     are converted to their respective characters. Escaped newlines `\\n` increment
+     `curr_lineno` and append `\n`.
+   - In `STRING_ERROR`, remaining characters are discarded until either a closing quote
+     or an unescaped newline is reached, ensuring subsequent tokens are scanned cleanly.
+   - EOF within a string produces "EOF in string constant".
+
+d. Error Recovery & Invalid Characters:
+   - Any character not matching valid Cool lexical syntax triggers the catch-all
+     rule `.`, returning `ERROR` with `cool_yylval.error_msg = yytext` and resuming
+     at the next character.
+
+3. Testing Strategy (`test.cl`)
+-------------------------------
+`test.cl` thoroughly tests:
+1. Single-line and deeply nested multi-line comments.
+2. Case-insensitive keywords and proper precedence between keywords and identifiers.
+3. Boolean constants vs capitalized Type Identifiers (`True`, `False`).
+4. All compound operators (`=>`, `<-`, `<=`) and single-character tokens.
+5. String constants, all escape sequences, multi-line escaped strings, and length checks.
+6. Real-world COOL classes containing complex expressions, loops, branches, and blocks.
+
